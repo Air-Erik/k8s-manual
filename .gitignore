@@ -66,3 +66,8 @@ charts/*.tgz
 # Personal notes (optional)
 NOTES.md
 TODO.md
+
+#images
+images/
+screenshots/
+.png

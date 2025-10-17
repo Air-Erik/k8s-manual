@@ -1,0 +1,68 @@
+# Kubernetes configs with secrets
+kubeconfig
+*.kubeconfig
+admin.conf
+
+# Certificates and keys
+*.key
+*.crt
+*.pem
+*.p12
+*.pfx
+
+# Secrets and credentials
+secrets/
+*.secret
+*-secret.yaml
+credentials.yaml
+
+# vCenter/vSphere credentials
+vsphere-config-secret.yaml
+csi-vsphere.conf
+
+# Backup files
+*.backup
+*.bak
+backup/
+etcd-snapshot-*.db
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Log files
+*.log
+logs/
+
+# Terraform (if used later)
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# Helm
+charts/*.tgz
+
+# Personal notes (optional)
+NOTES.md
+TODO.md

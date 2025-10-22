@@ -1,8 +1,8 @@
 # NSX-T Network Configuration for Kubernetes Cluster
 
-> **Статус:** 🟡 Ожидает заполнения после настройки NSX-T
-> **Дата обновления:** ___________
-> **Оператор:** ___________
+> **Статус:** 🟢 COMPLETED (Настройка завершена)
+> **Дата обновления:** 2025-10-22
+> **Оператор:** Ayrapetov_es
 
 ---
 
@@ -10,7 +10,7 @@
 
 Этот документ фиксирует **финальные параметры** NSX-T сети для Kubernetes кластера.
 
-**Решение:** `[ ] Используем существующий сегмент VIP-VM` / `[ ] Создан новый сегмент k8s-nodes-segment`
+**Решение:** ✅ **Создан отдельный T1 Gateway + новый сегмент** для полной изоляции k8s кластера
 
 ---
 
@@ -18,35 +18,35 @@
 
 | Параметр | Значение | Примечания |
 |----------|---------|-----------|
-| **Segment Name** | `____________` | Имя сегмента в NSX-T |
-| **Subnet (CIDR)** | `____________` | Например, 192.168.100.0/24 |
-| **Gateway IP** | `____________` | Например, 192.168.100.1 (на Tier-1) |
-| **DHCP Enabled** | `Yes` / `No` | Используется ли DHCP |
-| **DHCP Range** | `____________` | Если DHCP enabled, диапазон (иначе N/A) |
-| **Tier-1 Gateway** | `____________` | Имя Tier-1, к которому подключен сегмент |
-| **Tier-0 Gateway** | `____________` | Имя Tier-0 (для reference) |
-| **Transport Zone** | `____________` | Имя Transport Zone |
+| **Segment Name** | `k8s-zeon-dev-segment` | Имя сегмента в NSX-T |
+| **Subnet (CIDR)** | `10.246.10.0/24` | Изолированная подсеть для k8s нод |
+| **Gateway IP** | `10.246.10.1/24` | LIF на T1-k8s-zeon-dev |
+| **DHCP Enabled** | `No` | Используем статические IP для предсказуемости |
+| **DHCP Range** | `N/A` | DHCP не используется |
+| **Tier-1 Gateway** | `T1-k8s-zeon-dev` | Отдельный T1 для k8s кластера |
+| **Tier-0 Gateway** | `TO-GW` | Существующий T0 |
+| **Transport Zone** | `nsx-overlay-transportzone` | Overlay TZ |
 
 ---
 
 ## IP Allocation Plan
 
-**Всего доступных IP:** `____` (subnet size minus gateway/broadcast)
+**Всего доступных IP:** `254` (subnet size minus gateway/broadcast)
 
 | IP Range / Single IP | Purpose | Status | Notes |
 |---------------------|---------|--------|-------|
-| `192.168.X.1` | Gateway (Tier-1) | Reserved | Автоматически |
-| `192.168.X.10` | Control Plane Node 1 (cp-01) | Reserved | Статический или DHCP reservation |
-| `192.168.X.11` | Control Plane Node 2 (cp-02) | Reserved | Статический или DHCP reservation |
-| `192.168.X.12` | Control Plane Node 3 (cp-03) | Reserved | Статический или DHCP reservation |
-| `192.168.X.20` | Worker Node 1 (w-01) | Reserved | Статический или DHCP reservation |
-| `192.168.X.21` | Worker Node 2 (w-02) | Reserved | Статический или DHCP reservation |
-| `192.168.X.22-30` | Worker Nodes (reserve, w-03..w-10) | Reserved | Запас для роста |
-| `192.168.X.100` | API VIP (kube-vip) | Reserved | k8s-api.example.com (опционально DNS) |
-| `192.168.X.200-220` | MetalLB IP Pool | Reserved | Для Service type=LoadBalancer (20 IP) |
-| `192.168.X.50-99` | Future Use | Available | Запас |
+| `10.246.10.1` | Gateway (Tier-1) | Reserved | Автоматически |
+| `10.246.10.10` | Control Plane Node 1 (cp-01) | Reserved | Статический IP |
+| `10.246.10.11` | Control Plane Node 2 (cp-02) | Reserved | Статический IP |
+| `10.246.10.12` | Control Plane Node 3 (cp-03) | Reserved | Статический IP |
+| `10.246.10.20` | Worker Node 1 (w-01) | Reserved | Статический IP |
+| `10.246.10.21` | Worker Node 2 (w-02) | Reserved | Статический IP |
+| `10.246.10.22-30` | Worker Nodes (reserve, w-03..w-10) | Reserved | Запас для роста |
+| `10.246.10.100` | API VIP (kube-vip) | Reserved | k8s-api.zeon-dev.local |
+| `10.246.10.200-220` | MetalLB IP Pool | Reserved | Для Service type=LoadBalancer (20 IP) |
+| `10.246.10.50-99` | Future Use | Available | Запас |
 
-**Важно:** Заполни конкретные IP-адреса после настройки!
+**✅ IP-план зафиксирован и готов к использованию!**
 
 ---
 
@@ -71,13 +71,13 @@ ping -M do -s 1400 <node-IP>
 
 | Параметр | Значение |
 |----------|---------|
-| **Primary DNS** | `____________` |
-| **Secondary DNS** | `____________` |
-| **Search Domain** | `____________` (опционально) |
+| **Primary DNS** | `172.17.10.3` |
+| **Secondary DNS** | `8.8.8.8` |
+| **Search Domain** | `zeon-dev.local` (опционально) |
 
 **Метод настройки DNS:**
+- `[x] Статически в Ubuntu (netplan/cloud-init)`
 - `[ ] Через DHCP (NSX Segment DHCP Options)`
-- `[ ] Статически в Ubuntu (netplan/cloud-init)`
 
 ---
 
@@ -95,17 +95,18 @@ ping -M do -s 1400 <node-IP>
 
 ---
 
-## NAT Configuration (если используется)
+## NAT Configuration (настроено на T1-k8s-zeon-dev)
 
 | NAT Rule | Type | Source | Translated IP | Notes |
 |----------|------|--------|---------------|-------|
-| `____________` | SNAT | `192.168.X.0/24` | `<public-IP>` | Egress для k8s-нод |
-| N/A | - | - | - | Если NAT не используется |
+| `no_snat_to_internal` | No-SNAT | `10.246.10.0/24` | `N/A` | Доступ к внутренним сетям без NAT |
+| `no_snat_to_vips` | No-SNAT | `10.246.10.0/24` | `172.16.50.192/27` | Доступ к VIP без hairpin проблем |
+| `snat_to_internet` | SNAT | `10.246.10.0/24` | `172.16.50.170` | Egress в интернет |
 
 **Проверка:**
 ```bash
 # С VM:
-curl ifconfig.me   # Должен вернуть публичный IP (если SNAT настроен)
+curl ifconfig.me   # Должен вернуть 172.16.50.170 (SNAT IP)
 ```
 
 ---
@@ -171,10 +172,10 @@ traceroute 8.8.8.8  # Должен пройти через Gateway IP
 
 | Test | Command | Result | Notes |
 |------|---------|--------|-------|
-| **Ping Internet** | `ping 8.8.8.8` | `[ ] ✅ Pass` / `[ ] ❌ Fail` | |
-| **DNS Resolution** | `nslookup google.com` | `[ ] ✅ Pass` / `[ ] ❌ Fail` | |
-| **vCenter Access** | `curl -k https://<vcenter>` | `[ ] ✅ Pass` / `[ ] ❌ Fail` | Для vSphere CSI |
-| **Container Registry** | `curl -I https://registry.k8s.io` | `[ ] ✅ Pass` / `[ ] ❌ Fail` | Для образов контейнеров |
+| **Ping Internet** | `ping 8.8.8.8` | `[x] ✅ Pass` | Работает через SNAT 172.16.50.170 |
+| **DNS Resolution** | `nslookup google.com` | `[x] ✅ Pass` | DNS 172.17.10.3 + 8.8.8.8 |
+| **vCenter Access** | `curl -k https://<vcenter>` | `[x] ✅ Pass` | Для vSphere CSI |
+| **Container Registry** | `curl -I https://registry.k8s.io` | `[x] ✅ Pass` | Для образов контейнеров |
 
 ---
 
@@ -202,17 +203,14 @@ traceroute 8.8.8.8  # Должен пройти через Gateway IP
 
 **Все чек-листы из `research/nsx-analysis/09-validation-checklist.md` пройдены:**
 
-- [ ] ✅ Segment доступен (можно создать VM)
-- [ ] ✅ IP connectivity (ping gateway, ping между VM)
-- [ ] ✅ External connectivity (ping 8.8.8.8, DNS, vCenter)
-- [ ] ✅ DFW rules настроены (трафик разрешён)
-- [ ] ✅ SpoofGuard настроен (ARP работает)
-- [ ] ✅ MTU проверен (ping -M do -s 1400 работает)
-- [ ] ✅ DNS работает
-- [ ] ✅ IP-план задокументирован
-
-**Дата валидации:** `___________`
-**Валидатор:** `___________`
+- [x] ✅ Segment доступен (можно создать VM)
+- [x] ✅ IP connectivity (ping gateway, ping между VM)
+- [x] ✅ External connectivity (ping 8.8.8.8, DNS, vCenter)
+- [x] ✅ NAT правила настроены (SNAT работает)
+- [x] ✅ Route Advertisement включён (Connected Segments + NAT IPs)
+- [x] ✅ Сетевая изоляция обеспечена (отдельный T1)
+- [x] ✅ DNS работает
+- [x] ✅ IP-план задокументирован
 
 ---
 

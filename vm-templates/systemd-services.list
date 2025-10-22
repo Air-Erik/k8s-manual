@@ -1,0 +1,41 @@
+# Список systemd сервисов в VM Template
+# Автор: AI-агент VM Preparation Specialist
+# Дата: 2025-01-27
+# Версия: 1.0
+
+# Системные сервисы
+systemd-resolved
+systemd-timesyncd
+systemd-logind
+
+# Сетевые сервисы
+networking
+NetworkManager
+systemd-networkd
+
+# SSH сервис
+ssh
+
+# Container Runtime
+containerd
+
+# Kubernetes сервисы
+kubelet (enabled, но не running до kubeadm init)
+
+# Cloud-init
+cloud-init
+cloud-init-local
+cloud-config
+cloud-final
+
+# Firewall
+ufw
+
+# Дополнительные сервисы
+dbus
+systemd-journald
+systemd-udevd
+
+# Отключенные сервисы
+unattended-upgrades (disabled)
+snapd (disabled)

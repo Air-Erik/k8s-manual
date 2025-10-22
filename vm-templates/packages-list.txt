@@ -1,0 +1,54 @@
+# Список установленных пакетов в VM Template
+# Автор: AI-агент VM Preparation Specialist
+# Дата: 2025-01-27
+# Версия: 1.0
+
+# Операционная система
+ubuntu-24.04-lts
+linux-image-generic-6.8.x
+linux-headers-generic-6.8.x
+
+# Базовые пакеты
+curl
+wget
+vim
+net-tools
+htop
+tree
+jq
+unzip
+ca-certificates
+gnupg
+lsb-release
+
+# Container Runtime
+containerd.io-1.7.18
+runc-1.1.12
+cni-plugins-1.4.1
+
+# Kubernetes компоненты
+kubeadm-1.31.2
+kubelet-1.31.2
+kubectl-1.31.2
+
+# Cloud-init
+cloud-init-24.1
+
+# Системные утилиты
+systemd-255.4
+iptables-1.8.10
+ipvs-1.2.1
+bridge-utils
+
+# Сетевые утилиты
+iproute2
+netplan.io
+network-manager
+
+# Безопасность
+ufw
+openssh-server
+
+# Дополнительные утилиты
+apt-transport-https
+software-properties-common

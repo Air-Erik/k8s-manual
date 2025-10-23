@@ -23,10 +23,16 @@
 - ✅ Система обновлена
 
 ### Версии компонентов (из анализа)
-- **containerd:** 1.7.18
+- **containerd:** 1.7.18 (из Docker репозитория, включает runc)
+- **runc:** 1.1.12 (встроен в containerd.io)
 - **kubeadm/kubelet/kubectl:** 1.31.2
-- **runc:** 1.1.12
 - **CNI plugins:** 1.4.1
+
+### ⚠️ Важно: Совместимость пакетов
+- **Использовать Docker репозиторий** для containerd
+- **Устанавливать ТОЛЬКО containerd.io** (он включает runc)
+- **НЕ устанавливать runc отдельно** - это создает конфликт
+- **containerd.io уже содержит** все необходимые компоненты
 
 ---
 
@@ -71,6 +77,9 @@ EOF
 
 # Применить настройки
 sudo sysctl --system
+
+sudo modprobe overlay
+sudo modprobe br_netfilter
 
 # Проверить настройки
 sysctl net.ipv4.ip_forward
@@ -126,19 +135,21 @@ sudo apt install -y \
     lsb-release
 ```
 
-### 2.2. Добавление репозитория containerd
+### 2.2. Добавление репозитория Docker
 
 ```bash
 # Создать директорию для ключей
 sudo mkdir -p /etc/apt/keyrings
 
-# Добавить ключ GPG
+# Добавить ключ GPG Docker
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-# Добавить репозиторий
+# Добавить репозиторий Docker
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # Обновить список пакетов
 sudo apt update
@@ -147,12 +158,15 @@ sudo apt update
 ### 2.3. Установка containerd
 
 ```bash
-# Установить containerd
-sudo apt install -y containerd.io=1.7.18-1
+# Установить ТОЛЬКО containerd.io (он включает runc)
+sudo apt install -y containerd.io
 
 # Проверить установку
 containerd --version
 # Должно быть: containerd.io 1.7.18
+
+# ⚠️ ВАЖНО: НЕ устанавливать runc отдельно!
+# containerd.io уже включает runc внутри
 ```
 
 ### 2.4. Настройка containerd
@@ -177,17 +191,24 @@ sudo systemctl start containerd
 # Проверить статус
 sudo systemctl status containerd
 # Должен быть: active (running)
+
+# Фиксация версии
+sudo apt-mark hold containerd.io
 ```
 
-### 2.5. Установка runc
+### 2.5. Проверка встроенного runc
 
 ```bash
-# Установить runc
-sudo apt install -y runc
+# Проверить встроенный runc через containerd
+sudo ctr version
+# Должно показать версии containerd и runc
 
-# Проверить версию
-runc --version
-# Должна быть: 1.1.12
+# Проверить socket containerd
+ls -la /run/containerd/containerd.sock
+
+# Проверить статус сервиса
+sudo systemctl status containerd
+# Должен быть: active (running)
 ```
 
 ### 2.6. Установка CNI plugins
@@ -286,9 +307,9 @@ sudo systemctl status kubelet
 containerd --version
 # Должно быть: containerd.io 1.7.18
 
-# Проверить runc
-runc --version
-# Должно быть: 1.1.12
+# Проверить встроенный runc через containerd
+sudo ctr version
+# Должно показать версии containerd и runc
 
 # Проверить CNI plugins
 ls /opt/cni/bin/
@@ -329,9 +350,17 @@ sudo systemctl status containerd
 sudo systemctl status kubelet
 # Должен быть: enabled, но не running
 
-# Проверить конфигурацию kubelet
-sudo cat /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-# Должна содержать правильные настройки
+# Проверить, что kubelet готов к работе
+sudo systemctl is-enabled kubelet
+# Должно быть: enabled
+
+# Проверить, что kubelet НЕ запущен (это нормально)
+sudo systemctl is-active kubelet
+# Должно быть: inactive (это нормально до kubeadm init)
+
+# Проверить готовность системы
+sudo kubeadm config images list
+# Должен показать список образов для загрузки
 ```
 
 ---
@@ -380,12 +409,34 @@ free -h
 
 ## Возможные проблемы и решения
 
-### Проблема 1: containerd не запускается
+### Проблема 1: Конфликт пакетов containerd и runc
+**Симптомы:** `containerd.io : Conflicts: runc` при установке
+**Причина:** containerd.io уже включает runc, отдельная установка создает конфликт
+**Решение:**
+```bash
+# Удалить все пакеты
+sudo apt remove --purge containerd.io runc containerd
+sudo apt autoremove
+sudo apt autoclean
+
+# Установить ТОЛЬКО containerd.io (он включает runc)
+sudo apt update
+sudo apt install -y containerd.io
+
+# Проверить установку
+containerd --version
+sudo ctr version
+```
+
+### Проблема 2: containerd не запускается
 **Симптомы:** `systemctl status containerd` показывает ошибки
 **Решение:**
 ```bash
 # Проверить конфигурацию
 sudo containerd config default | sudo tee /etc/containerd/config.toml
+
+# Настроить systemd cgroup driver
+sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 
 # Перезапустить
 sudo systemctl restart containerd
@@ -394,7 +445,7 @@ sudo systemctl restart containerd
 sudo journalctl -u containerd
 ```
 
-### Проблема 2: kubelet не может подключиться к containerd
+### Проблема 3: kubelet не может подключиться к containerd
 **Симптомы:** Ошибки в логах kubelet
 **Решение:**
 ```bash
@@ -405,7 +456,7 @@ ls -la /var/run/containerd/containerd.sock
 sudo chmod 666 /var/run/containerd/containerd.sock
 ```
 
-### Проблема 3: CNI plugins не найдены
+### Проблема 4: CNI plugins не найдены
 **Симптомы:** Ошибки при запуске kubelet
 **Решение:**
 ```bash

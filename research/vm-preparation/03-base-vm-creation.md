@@ -97,8 +97,8 @@ DNS: 172.17.10.3, 8.8.8.8
 ```
 Full name: Kubernetes Admin
 Username: k8s-admin
-Password: [сложный пароль, будет изменён]
-Confirm password: [повторить]
+Password: admin
+Confirm password: admin
 ```
 
 **Installation Options:**
@@ -125,7 +125,7 @@ Confirm password: [повторить]
 
 ```bash
 # С рабочей станции оператора
-ssh k8s-admin@10.246.10.250
+ssh k8s-admin@172.16.50.171
 
 # Проверить версию ОС
 lsb_release -a
@@ -205,7 +205,7 @@ X11Forwarding no
 sudo systemctl restart sshd
 
 # Проверить подключение по ключу
-ssh k8s-admin@10.246.10.250
+ssh k8s-admin@172.16.50.171
 ```
 
 ### 3.5. Отключение автоматических обновлений
@@ -309,7 +309,7 @@ ping -c 3 8.8.8.8
 
 ```bash
 # С рабочей станции оператора
-ssh k8s-admin@10.246.10.250
+ssh k8s-admin@172.16.50.171
 
 # Проверить системную информацию
 uname -a

@@ -156,7 +156,7 @@ users:
     shell: /bin/bash
     groups: [adm, systemd-journal]
     ssh_authorized_keys:
-      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... operator@workstation
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGknQbtoiQ9OhJ5+Fi35iKr5qArSLJkj+rcK0Ej19EjA eric@REMOTE-VM
 
 # Настройки для Ubuntu
 disable_root: true
@@ -422,7 +422,7 @@ users:
   - name: k8s-admin
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_authorized_keys:
-      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... operator@workstation
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGknQbtoiQ9OhJ5+Fi35iKr5qArSLJkj+rcK0Ej19EjA eric@REMOTE-VM
 
 write_files:
   - path: /etc/netplan/01-static-ip.yaml

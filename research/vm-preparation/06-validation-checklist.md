@@ -62,6 +62,30 @@
 
 ### 2.2. Cloud-init конфигурация для теста
 
+В vCenter используем спецификацию с двумя полями: metadata и user-data.
+
+Cloud-init metadata (сети и базовая идентификация):
+```yaml
+instance-id: k8s-test-node-001
+local-hostname: k8s-test-node
+
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    nic0:
+      match:
+        driver: vmxnet3
+      addresses:
+        - 10.246.10.250/24
+      routes:
+        - to: default
+          via: 10.246.10.1
+      nameservers:
+        addresses: [172.17.10.3, 8.8.8.8]
+```
+
+Cloud-init user-data (пользователи и сервисы):
 ```yaml
 #cloud-config
 hostname: k8s-test-node
@@ -69,59 +93,26 @@ fqdn: k8s-test-node.zeon-dev.local
 
 users:
   - name: k8s-admin
-    sudo: ALL=(ALL) NOPASSWD:ALL
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
     shell: /bin/bash
     groups: [adm, systemd-journal, docker]
+    create_home: true
     ssh_authorized_keys:
       - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... operator@workstation
-    home: /home/k8s-admin
-    create_home: true
-
-write_files:
-  - path: /etc/netplan/01-static-ip.yaml
-    content: |
-      network:
-        version: 2
-        ethernets:
-          ens192:
-            addresses: [10.246.10.250/24]
-            gateway4: 10.246.10.1
-            nameservers:
-              addresses: [172.17.10.3, 8.8.8.8]
-            dhcp4: false
-            dhcp6: false
-    permissions: '0644'
-    owner: root:root
 
 runcmd:
-  - netplan apply
-  - modprobe overlay
-  - modprobe br_netfilter
-  - sysctl --system
   - timedatectl set-timezone UTC
-  - systemctl enable containerd
+  - systemctl enable containerd kubelet
   - systemctl start containerd
-  - systemctl enable kubelet
   - systemctl daemon-reload
-  - apt clean
-  - mkdir -p /home/k8s-admin/.ssh
-  - chmod 700 /home/k8s-admin/.ssh
-  - chown k8s-admin:k8s-admin /home/k8s-admin/.ssh
 
 final_message: |
   ==========================================
-  🎉 Kubernetes Test VM готова!
+  Kubernetes Test VM готова
   ==========================================
-
   Хост: k8s-test-node
   IP: 10.246.10.250
   Пользователь: k8s-admin
-
-  Следующие шаги:
-  1. Проверить подключение: ssh k8s-admin@10.246.10.250
-  2. Запустить валидацию: ./scripts/validate-vm-template.sh
-
-  ==========================================
 ```
 
 ---

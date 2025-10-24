@@ -43,184 +43,77 @@
 
 ### 1.2. Cloud-init конфигурация для теста
 
+Cloud-init metadata (сеть и идентификация):
+```yaml
+instance-id: k8s-test-node-001
+local-hostname: k8s-test-node
+
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    nic0:
+      match:
+        driver: vmxnet3
+      addresses:
+        - 10.246.10.250/24
+      routes:
+        - to: default
+          via: 10.246.10.1
+      nameservers:
+        addresses: [172.17.10.3, 8.8.8.8]
+```
+
+Cloud-init user-data (пользователи и сервисы):
 ```yaml
 #cloud-config
-# Тестовая cloud-init конфигурация для проверки Template
-# Автор: AI-агент VM Preparation Specialist
-# Дата: 2025-01-27
-
-# Основные настройки
 hostname: k8s-test-node
 fqdn: k8s-test-node.zeon-dev.local
 
-# Настройки пользователей
 users:
   - name: k8s-admin
-    sudo: ALL=(ALL) NOPASSWD:ALL
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
     shell: /bin/bash
     groups: [adm, systemd-journal, docker]
+    create_home: true
     ssh_authorized_keys:
       - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... operator@workstation
-    home: /home/k8s-admin
-    create_home: true
 
-# Настройки SSH
 ssh_pwauth: false
 disable_root: true
-ssh_deletekeys: true
-ssh_genkeytypes: ['rsa', 'ecdsa', 'ed25519']
 
-# Настройки сети
-network:
-  config: disabled
-
-# Файлы для создания
 write_files:
-  # Настройка статического IP
-  - path: /etc/netplan/01-static-ip.yaml
-    content: |
-      network:
-        version: 2
-        ethernets:
-          ens192:
-            addresses: [10.246.10.250/24]
-            gateway4: 10.246.10.1
-            nameservers:
-              addresses: [172.17.10.3, 8.8.8.8]
-            dhcp4: false
-            dhcp6: false
+  - path: /etc/default/kubelet
     permissions: '0644'
     owner: root:root
-
-  # Настройка kubelet для containerd
-  - path: /etc/default/kubelet
     content: |
       KUBELET_EXTRA_ARGS="--container-runtime=remote --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --runtime-cgroups=/system.slice/containerd.service"
+  - path: /etc/sysctl.d/99-kubernetes.conf
     permissions: '0644'
     owner: root:root
-
-  # Настройка sysctl для Kubernetes
-  - path: /etc/sysctl.d/99-kubernetes.conf
     content: |
-      # IP forwarding для pod networking
       net.ipv4.ip_forward = 1
       net.ipv6.conf.all.forwarding = 1
-
-      # Bridge netfilter для CNI
       net.bridge.bridge-nf-call-iptables = 1
       net.bridge.bridge-nf-call-ip6tables = 1
 
-      # Дополнительные настройки для производительности
-      net.core.somaxconn = 32768
-      net.core.netdev_max_backlog = 5000
-      net.ipv4.tcp_max_syn_backlog = 8192
-    permissions: '0644'
-    owner: root:root
-
-  # Настройка модулей ядра
-  - path: /etc/modules-load.d/kubernetes.conf
-    content: |
-      overlay
-      br_netfilter
-    permissions: '0644'
-    owner: root:root
-
-  # Настройка timezone
-  - path: /etc/timezone
-    content: |
-      UTC
-    permissions: '0644'
-    owner: root:root
-
-# Команды для выполнения
 runcmd:
-  # Применить сетевые настройки
-  - netplan apply
-
-  # Загрузить модули ядра
   - modprobe overlay
   - modprobe br_netfilter
-
-  # Применить sysctl настройки
   - sysctl --system
-
-  # Настроить timezone
   - timedatectl set-timezone UTC
-
-  # Включить и запустить containerd
-  - systemctl enable containerd
+  - systemctl enable containerd kubelet
   - systemctl start containerd
-
-  # Включить kubelet (но не запускать до kubeadm init)
-  - systemctl enable kubelet
-
-  # Перезагрузить systemd
   - systemctl daemon-reload
-
-  # Очистить кэш пакетов
   - apt clean
 
-  # Создать директорию для SSH ключей
-  - mkdir -p /home/k8s-admin/.ssh
-  - chmod 700 /home/k8s-admin/.ssh
-  - chown k8s-admin:k8s-admin /home/k8s-admin/.ssh
-
-  # Настроить firewall для тестирования
-  - ufw --force enable
-  - ufw allow ssh
-  - ufw allow 10250/tcp
-  - ufw allow 30000:32767/tcp
-  - ufw allow 80/tcp
-  - ufw allow 443/tcp
-
-# Настройки для первого запуска
-cloud_init_modules:
-  - migrator
-  - seed_random
-  - bootcmd
-  - write-files
-  - growpart
-  - resizefs
-  - disk_setup
-  - mounts
-  - set-passwords
-  - ssh
-
-cloud_final_modules:
-  - package-update-upgrade-install
-  - runcmd
-  - byobu
-  - landscape
-  - lxd
-  - puppet
-  - chef
-  - salt-minion
-  - mcollective
-  - disable-ec2-metadata
-  - final-message
-  - power-state-change
-
-# Настройки для финального сообщения
 final_message: |
   ==========================================
-  🎉 Kubernetes Test VM готова!
+  Kubernetes Test VM готова
   ==========================================
-
   Хост: k8s-test-node
   IP: 10.246.10.250
   Пользователь: k8s-admin
-
-  Следующие шаги:
-  1. Проверить подключение: ssh k8s-admin@10.246.10.250
-  2. Запустить валидацию: ./scripts/validate-vm-template.sh
-  3. Проверить готовность к kubeadm: kubeadm config images list
-
-  ==========================================
-
-# Настройки для отключения автоматических обновлений
-package_update: false
-package_upgrade: false
-package_reboot_if_required: false
 ```
 
 ---
